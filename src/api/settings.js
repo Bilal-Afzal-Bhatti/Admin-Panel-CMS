@@ -3,46 +3,42 @@ import axiosInstance from './axiosInstance';
 
 // ─── Query Key Factory ────────────────────────────────────────────────────────
 export const settingsKeys = {
-  all:           ()  => ['settings'],
-  profile:       ()  => [...settingsKeys.all(), 'profile'],
-  store:         ()  => [...settingsKeys.all(), 'store'],
-  notifications: ()  => [...settingsKeys.all(), 'notifications'],
+  all:           () => ['settings'],
+  profile:       () => [...settingsKeys.all(), 'profile'],
+  store:         () => [...settingsKeys.all(), 'store'],
+  notifications: () => [...settingsKeys.all(), 'notifications'],
 };
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
+// axiosInstance interceptor already returns response.data directly
+// so the result here is already { success, data, message }
+
 export const getProfile = async () => {
-  const res = await axiosInstance.get('/settings/profile');
-  return res.data;
+  return axiosInstance.get('/settings/profile');
 };
 
 export const updateProfile = async (data) => {
-  const res = await axiosInstance.put('/settings/profile', data);
-  return res.data;
+  return axiosInstance.put('/settings/profile', data);
 };
 
 export const changePassword = async (data) => {
-  const res = await axiosInstance.put('/settings/password', data);
-  return res;
+  return axiosInstance.put('/settings/password', data);
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 export const getStoreSettings = async () => {
-  const res = await axiosInstance.get('/settings/store');
-  return res.data;
+  return axiosInstance.get('/settings/store');
 };
 
 export const updateStoreSettings = async (data) => {
-  const res = await axiosInstance.put('/settings/store', data);
-  return res.data;
+  return axiosInstance.put('/settings/store', data);
 };
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 export const getNotificationSettings = async () => {
-  const res = await axiosInstance.get('/settings/notifications');
-  return res.data;
+  return axiosInstance.get('/settings/notifications');
 };
 
 export const updateNotificationSettings = async (data) => {
-  const res = await axiosInstance.put('/settings/notifications', data);
-  return res.data;
+  return axiosInstance.put('/settings/notifications', data);
 };
