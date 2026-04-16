@@ -1,14 +1,15 @@
-// src/pages/ProductsPage.jsx
 import { useState, useCallback } from 'react';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
   IconButton, Chip, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, InputAdornment, Pagination, Alert, Snackbar,
+  DialogActions, TextField, InputAdornment, Alert, Snackbar,
+  Rating, MenuItem, Tooltip, Avatar, List, ListItem, Card
 } from '@mui/material';
-import AddIcon    from '@mui/icons-material/Add';
+import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
-import EditIcon   from '@mui/icons-material/EditOutlined';
+import EditIcon from '@mui/icons-material/EditOutlined';
+import PaletteIcon from '@mui/icons-material/Palette';
 import {
   useProductList,
   useCreateProduct,
@@ -17,49 +18,110 @@ import {
 } from '../hooks/useproducts';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EMPTY_FORM = { name: '', price: '', stock: '', image: '', discount: '' };
+const EMPTY_FORM = { 
+  name: '', price: '', stock: '', image: '', discount: '', category: 'Other', colors: [] 
+};
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+const COLOR_OPTIONS = [
+  { name: 'Red', hex: '#FF0000' }, { name: 'Blue', hex: '#0000FF' },
+  { name: 'Green', hex: '#008000' }, { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' }, { name: 'Yellow', hex: '#FFFF00' },
+  { name: 'Pink', hex: '#FFC0CB' }, { name: 'Purple', hex: '#800080' },
+  { name: 'Orange', hex: '#FFA500' }, { name: 'Grey', hex: '#808080' },
+  { name: 'Navy', hex: '#000080' },
+];
+
+const CATEGORIES = [
+  'Electronics', 'Clothing', 'Footwear', 'Accessories', 'Home & Kitchen', 
+  'Beauty & Health', 'Sports & Outdoors', 'Toys & Games', 'Books', 'Other'
+];
+
+// ─── Validation ─────────────────────────────────────────────────────────────
 const validate = (form) => {
   const errs = {};
-  if (!form.name)                                  errs.name  = 'Product name is required.';
-  if (!form.image)                                 errs.image = 'Image URL is required.';
-  if (form.price === '' || Number(form.price) < 0) errs.price = 'Valid positive price is required.';
-  if (form.stock === '' || Number(form.stock) < 0) errs.stock = 'Valid stock count is required.';
+  if (!form.name) errs.name = 'Product name is required.';
+  if (!form.image) errs.image = 'Image URL is required.';
+  if (form.price === '' || Number(form.price) < 0) errs.price = 'Price cannot be negative.';
+  if (form.stock === '' || Number(form.stock) < 0) errs.stock = 'Stock cannot be negative.';
   return errs;
 };
 
 // ─── ProductForm ──────────────────────────────────────────────────────────────
 function ProductForm({ form, setForm, errors, setErrors }) {
+  const [newColor, setNewColor] = useState({ name: '', hex: '#000000', stock: 0 });
+
   const handle = (field) => (e) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    let val = e.target.value;
+    if ((field === 'price' || field === 'stock') && val < 0) val = 0; 
+    setForm((prev) => ({ ...prev, [field]: val }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
   };
+
+  const handleColorSelect = (e) => {
+    const selectedColor = COLOR_OPTIONS.find(c => c.name === e.target.value);
+    setNewColor({ ...newColor, name: selectedColor.name, hex: selectedColor.hex });
+  };
+
+  const addColorToForm = () => {
+    if (!newColor.name) return;
+    const safeStock = Math.max(0, newColor.stock);
+    setForm(prev => ({
+      ...prev,
+      colors: [...(prev.colors || []), { ...newColor, stock: safeStock }],
+      stock: Number(prev.stock || 0) + safeStock
+    }));
+    setNewColor({ name: '', hex: '#000000', stock: 0 }); 
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
-      <TextField label="Product Name" fullWidth required
-        value={form.name} onChange={handle('name')}
-        error={!!errors.name} helperText={errors.name} />
-      <TextField label="Image URL" fullWidth required
-        placeholder="https://example.com/image.jpg"
-        value={form.image} onChange={handle('image')}
-        error={!!errors.image} helperText={errors.image} />
+      <TextField label="Product Name" fullWidth required value={form.name} onChange={handle('name')} error={!!errors.name} helperText={errors.name} />
+      <TextField select label="Category" fullWidth required value={form.category || 'Other'} onChange={handle('category')}>
+        {CATEGORIES.map((option) => (<MenuItem key={option} value={option}>{option}</MenuItem>))}
+      </TextField>
+      <TextField label="Image URL" fullWidth required value={form.image} onChange={handle('image')} error={!!errors.image} helperText={errors.image} />
+      
       <Box sx={{ display: 'flex', gap: 2 }}>
-        <TextField label="Price" type="number" fullWidth required
-          InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-          value={form.price} onChange={handle('price')}
-          error={!!errors.price} helperText={errors.price} />
-        <TextField label="Stock" type="number" fullWidth required
-          value={form.stock} onChange={handle('stock')}
-          error={!!errors.stock} helperText={errors.stock} />
+        <TextField label="Price" type="number" fullWidth required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} value={form.price} onChange={handle('price')} error={!!errors.price} helperText={errors.price} />
+        <TextField label="Total Stock" type="number" fullWidth required value={form.stock} onChange={handle('stock')} error={!!errors.stock} helperText={errors.stock} InputProps={{ readOnly: (form.colors?.length > 0) }} />
       </Box>
-      <TextField label="Discount (Optional)" fullWidth placeholder="e.g. 20% OFF"
-        value={form.discount} onChange={handle('discount')} />
+
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <TextField select label="Select Color" size="small" sx={{ flex: 2 }} value={newColor.name} onChange={handleColorSelect}>
+          {COLOR_OPTIONS.map((option) => (
+            <MenuItem key={option.name} value={option.name}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: option.hex, border: '1px solid #ccc' }} />
+                {option.name}
+              </Box>
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField type="number" label="Stock" size="small" sx={{ flex: 1 }} value={newColor.stock} 
+          onChange={(e) => setNewColor({...newColor, stock: Math.max(0, parseInt(e.target.value) || 0)})} 
+        />
+        <Button variant="contained" onClick={addColorToForm} sx={{ height: 40 }}>Add</Button>
+      </Box>
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        {form.colors?.map((c, i) => (
+          <Chip key={i} label={`${c.name} (${c.stock})`} avatar={<Avatar sx={{ bgcolor: c.hex, width: 24, height: 24 }}> </Avatar>}
+            onDelete={() => {
+              setForm(prev => ({
+                ...prev,
+                colors: prev.colors.filter((_, idx) => idx !== i),
+                stock: Math.max(0, prev.stock - c.stock)
+              }))
+            }}
+          />
+        ))}
+      </Box>
+      <TextField label="Discount (Optional)" fullWidth value={form.discount} onChange={handle('discount')} />
     </Box>
   );
 }
 
-// ─── ProductDialog ────────────────────────────────────────────────────────────
+// ─── ProductDialog ──────────────────────────────────────────────────────────
 function ProductDialog({ open, title, form, setForm, errors, setErrors, isPending, onClose, onSave }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -67,9 +129,9 @@ function ProductDialog({ open, title, form, setForm, errors, setErrors, isPendin
       <DialogContent dividers>
         <ProductForm form={form} setForm={setForm} errors={errors} setErrors={setErrors} />
       </DialogContent>
-      <DialogActions sx={{ p: 2, px: 3 }}>
-        <Button onClick={onClose} color="inherit" disabled={isPending}>Cancel</Button>
-        <Button onClick={onSave} variant="contained" disableElevation disabled={isPending}>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} color="inherit">Cancel</Button>
+        <Button onClick={onSave} variant="contained" disabled={isPending}>
           {isPending ? 'Saving...' : 'Save Product'}
         </Button>
       </DialogActions>
@@ -77,215 +139,179 @@ function ProductDialog({ open, title, form, setForm, errors, setErrors, isPendin
   );
 }
 
+// ─── VariantViewer (Horizontal Scrolling) ──────────────────────────────────
+function VariantViewer({ product, onClose }) {
+  if (!product) return null;
+  return (
+    <Dialog open={Boolean(product)} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 'bold' }}>
+        Variants for {product.name}
+      </DialogTitle>
+      <DialogContent dividers sx={{ pb: 3 }}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            gap: 2, 
+            overflowX: 'auto', 
+            py: 1,
+            // Custom scrollbar for better UI
+            '&::-webkit-scrollbar': { height: '8px' },
+            '&::-webkit-scrollbar-thumb': { bgcolor: '#ccc', borderRadius: '4px' }
+          }}
+        >
+          {product.colors?.length > 0 ? (
+            product.colors.map((c, i) => (
+              <Card 
+                key={i} 
+                variant="outlined" 
+                sx={{ 
+                  minWidth: 120, 
+                  textAlign: 'center', 
+                  p: 2, 
+                  borderRadius: 2,
+                  flexShrink: 0,
+                  bgcolor: 'background.default'
+                }}
+              >
+                <Box sx={{ width: 30, height: 30, borderRadius: '50%', bgcolor: c.hex, border: '2px solid #ddd', mx: 'auto', mb: 1 }} />
+                <Typography variant="subtitle2" fontWeight="bold">{c.name}</Typography>
+                <Typography variant="caption" color="text.secondary">Stock</Typography>
+                <Typography variant="h6" color={c.stock > 0 ? 'primary.main' : 'error.main'}>
+                  {c.stock}
+                </Typography>
+              </Card>
+            ))
+          ) : (
+            <Typography sx={{ p: 2 }} color="text.secondary">No color variants available.</Typography>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
-  const [page, setPage]             = useState(1);
-  const [addOpen, setAddOpen]       = useState(false);
+  const [page, setPage] = useState(1);
+  const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm]             = useState(EMPTY_FORM);
-  const [errors, setErrors]         = useState({});
-  const [toast, setToast]           = useState({ open: false, message: '', severity: 'success' });
+  const [viewingProduct, setViewingProduct] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState({});
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
 
-  const showToast = useCallback((message, severity = 'success') => {
-    setToast({ open: true, message, severity });
-  }, []);
+  const { data, isLoading } = useProductList(page);
+  const products = data?.products ?? [];
 
-  // ── Data ───────────────────────────────────────────────────────────────────
-  const { data, isLoading, isError, error, prefetchNext } = useProductList(page);
-  const products   = data?.products   ?? [];
-  const totalPages = data?.totalPages ?? 1;
+  const showToast = useCallback((message, severity = 'success') => setToast({ open: true, message, severity }), []);
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
   const createMutation = useCreateProduct({
-    onSuccess: () => { setAddOpen(false); setForm(EMPTY_FORM); setErrors({}); showToast('Product added!'); },
-    onError:   (e) => showToast(e.message, 'error'),
+    onSuccess: () => { setAddOpen(false); setForm(EMPTY_FORM); showToast('Product added!'); },
+    onError: (e) => showToast(e.message, 'error'),
   });
 
   const updateMutation = useUpdateProduct({
-    onSuccess: () => { setEditTarget(null); setForm(EMPTY_FORM); setErrors({}); showToast('Product updated!'); },
-    onError:   (e) => showToast(e.message, 'error'),
+    onSuccess: () => { setEditTarget(null); setForm(EMPTY_FORM); showToast('Product updated!'); },
+    onError: (e) => showToast(e.message, 'error'),
   });
 
   const deleteMutation = useDeleteProduct({
     onSuccess: () => showToast('Product deleted.'),
-    onError:   (e) => showToast(e.message, 'error'),
+    onError: (e) => showToast(e.message, 'error'),
   });
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
-  const openAdd = () => { setForm(EMPTY_FORM); setErrors({}); setAddOpen(true); };
-
-  const openEdit = (product) => {
-    setEditTarget(product);
-    setForm({
-      name:     product.name,
-      price:    String(product.price),
-      stock:    String(product.stock),
-      image:    product.image,
-      discount: product.discount === 'No Discount' ? '' : product.discount,
-    });
-    setErrors({});
-  };
 
   const handleSave = (isEdit) => {
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    const payload = {
-      ...form,
-      price:    parseFloat(form.price),
-      stock:    parseInt(form.stock, 10),
-      discount: form.discount || 'No Discount',
-    };
+    const payload = { ...form, price: parseFloat(form.price), stock: parseInt(form.stock, 10) };
     if (isEdit) updateMutation.mutate({ id: editTarget._id, ...payload });
-    else        createMutation.mutate(payload);
+    else createMutation.mutate(payload);
   };
 
-  const handlePageChange = (_, v) => { setPage(v); prefetchNext(); };
+  if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
-  // ── States ─────────────────────────────────────────────────────────────────
-  if (isLoading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
-      <CircularProgress />
-    </Box>
-  );
-
-  if (isError) return (
-    <Alert severity="error" sx={{ mt: 3 }}>{error?.message || 'Error loading products.'}</Alert>
-  );
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Box>
-
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-          Products
-          <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1.5 }}>
-            ({data?.total ?? 0} total)
-          </Typography>
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd} sx={{ borderRadius: 2 }}>
-          Add Product
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold">Products</Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => {setForm(EMPTY_FORM); setAddOpen(true);}}>Add Product</Button>
       </Box>
 
-      {/* Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
-        <Table sx={{ minWidth: 650 }}>
+      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+        <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: 'background.default' }}>
-              {['Product', 'Sale Price', 'Promo Info', 'Stock', 'Actions'].map((h) => (
-                <TableCell key={h} align={h === 'Actions' ? 'right' : 'left'}
-                  sx={{ fontWeight: 'bold', color: 'text.secondary' }}>{h}</TableCell>
-              ))}
-            </TableRow>
+           <TableRow sx={{ bgcolor: 'background.default' }}>
+  {['Product', 'Category', 'Price', 'Variants', 'Stock', 'Actions'].map((h) => (
+    <TableCell 
+      key={h} 
+      sx={{ 
+        fontWeight: 'bold',
+        // If it's the Actions column, nudge it right with padding
+        pl: h === 'Actions' ? 10 : 2, 
+        // Ensure the text itself stays left-aligned but shifted
+        textAlign: 'left' 
+      }}
+    >
+      {h}
+    </TableCell>
+  ))}
+</TableRow>
           </TableHead>
           <TableBody>
             {products.map((row) => (
-              <TableRow key={row._id}
-                sx={{ '&:last-child td': { border: 0 }, '&:hover': { bgcolor: 'rgba(0,0,0,0.01)' } }}>
-
-                {/* Product */}
+              <TableRow key={row._id} hover>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box component="img" src={row.image} alt={row.name}
-                      sx={{ width: 48, height: 48, borderRadius: 1, objectFit: 'cover' }} />
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>{row.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        ID: {row._id?.substring(0, 8)}
-                      </Typography>
-                    </Box>
+                    <Box component="img" src={row.image} sx={{ width: 44, height: 44, borderRadius: 1 }} />
+                    <Typography variant="body2" fontWeight={600}>{row.name}</Typography>
                   </Box>
                 </TableCell>
-
-                {/* Price */}
+                <TableCell><Chip label={row.category} size="small" variant="outlined" /></TableCell>
+                <TableCell><Typography variant="body2" fontWeight="bold">${row.price}</Typography></TableCell>
+                
+                {/* Variants Cell */}
                 <TableCell>
-                  <Typography variant="body1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                    ${row.price}
-                  </Typography>
-                  {row.originalPrice && (
-                    <Typography variant="caption" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
-                      ${row.originalPrice}
-                    </Typography>
-                  )}
+                  <Tooltip title="Click to view stock details" arrow>
+                    <Box 
+                      onClick={() => setViewingProduct(row)} 
+                      sx={{ display: 'flex', gap: 0.5, cursor: 'pointer', alignItems: 'center' }}
+                    >
+                      {row.colors?.slice(0, 3).map((c, i) => (
+                        <Box key={i} sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: c.hex, border: '1px solid #ddd' }} />
+                      ))}
+                      {row.colors?.length > 3 && <Typography variant="caption">+{row.colors.length - 3}</Typography>}
+                    </Box>
+                  </Tooltip>
                 </TableCell>
 
-                {/* Discount */}
-                <TableCell>
-                  <Chip label={row.discount} size="small" color="error"
-                    variant="outlined" sx={{ fontWeight: 'bold' }} />
-                </TableCell>
-
-                {/* Stock */}
-                <TableCell>
-                  <Chip
-                    label={`${row.stock} in stock`} size="small" sx={{ fontWeight: 600 }}
-                    color={row.stock > 10 ? 'success' : row.stock > 0 ? 'warning' : 'error'}
-                  />
-                </TableCell>
-
-                {/* Actions */}
-                <TableCell align="right">
-                  <IconButton color="primary" size="small" onClick={() => openEdit(row)}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton color="error" size="small"
-                    onClick={() => deleteMutation.mutate(row._id)}
-                    disabled={deleteMutation.isPending}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
+                <TableCell><Chip label={row.stock} size="small" color={row.stock > 10 ? 'success' : 'error'} /></TableCell>
+                
+                <TableCell align="center">
+                  <Tooltip title="Quick View Variants" arrow>
+                    <IconButton color="info" onClick={() => setViewingProduct(row)}><PaletteIcon /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Edit Product" arrow>
+                    <IconButton color="primary" onClick={() => {setEditTarget(row); setForm({...row, price: String(row.price), stock: String(row.stock)});}}><EditIcon /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete Product" arrow>
+                    <IconButton color="error" onClick={() => deleteMutation.mutate(row._id)}><DeleteIcon /></IconButton>
+                  </Tooltip>
                 </TableCell>
               </TableRow>
             ))}
-
-            {products.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
-                  <Typography color="text.secondary">No products found. Add some!</Typography>
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination count={totalPages} page={page} onChange={handlePageChange} color="primary" />
-        </Box>
-      )}
-
-      {/* Add Dialog */}
-      <ProductDialog
-        open={addOpen} title="Add New Product"
-        form={form} setForm={setForm} errors={errors} setErrors={setErrors}
-        isPending={createMutation.isPending}
-        onClose={() => setAddOpen(false)}
-        onSave={() => handleSave(false)}
-      />
-
-      {/* Edit Dialog */}
-      <ProductDialog
-        open={!!editTarget} title="Edit Product"
-        form={form} setForm={setForm} errors={errors} setErrors={setErrors}
-        isPending={updateMutation.isPending}
-        onClose={() => setEditTarget(null)}
-        onSave={() => handleSave(true)}
-      />
-
-      {/* Toast */}
-      <Snackbar
-        open={toast.open} autoHideDuration={3000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert severity={toast.severity} variant="filled" sx={{ width: '100%' }}>
-          {toast.message}
-        </Alert>
+      {/* Dialogs */}
+      <ProductDialog open={addOpen} title="Add New Product" form={form} setForm={setForm} errors={errors} setErrors={setErrors} isPending={createMutation.isPending} onClose={() => setAddOpen(false)} onSave={() => handleSave(false)} />
+      <ProductDialog open={Boolean(editTarget)} title="Edit Product" form={form} setForm={setForm} errors={errors} setErrors={setErrors} isPending={updateMutation.isPending} onClose={() => setEditTarget(null)} onSave={() => handleSave(true)} />
+      <VariantViewer product={viewingProduct} onClose={() => setViewingProduct(null)} />
+      
+      <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast({...toast, open: false})}>
+        <Alert severity={toast.severity}>{toast.message}</Alert>
       </Snackbar>
-
     </Box>
   );
 }
