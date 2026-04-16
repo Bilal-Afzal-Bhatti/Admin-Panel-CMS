@@ -72,56 +72,7 @@ export const useCreateProduct = (callbacks = {}) => {
   });
 };
 
-// ─── useUpdateProduct ─────────────────────────────────────────────────────────
-export const useUpdateProduct = (callbacks = {}) => {
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: updateProduct,
-
-    onMutate: async (updatedProduct) => {
-      await queryClient.cancelQueries({ queryKey: productKeys.lists() });
-      await queryClient.cancelQueries({ queryKey: productKeys.detail(updatedProduct.id) });
-
-      const previousLists  = queryClient.getQueriesData({ queryKey: productKeys.lists() });
-      const previousDetail = queryClient.getQueryData(productKeys.detail(updatedProduct.id));
-
-      // Optimistic update all list pages
-      queryClient.setQueriesData({ queryKey: productKeys.lists() }, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          data: old.data.map((p) =>
-            p._id === updatedProduct.id ? { ...p, ...updatedProduct } : p
-          ),
-        };
-      });
-
-      queryClient.setQueryData(productKeys.detail(updatedProduct.id), (old) =>
-        old ? { ...old, ...updatedProduct } : old
-      );
-
-      return { previousLists, previousDetail };
-    },
-
-    onError: (error, updatedProduct, context) => {
-      context?.previousLists?.forEach(([queryKey, data]) => {
-        queryClient.setQueryData(queryKey, data);
-      });
-      queryClient.setQueryData(
-        productKeys.detail(updatedProduct.id),
-        context?.previousDetail
-      );
-      callbacks.onError?.(error);
-    },
-
-    onSettled: (_, __, updatedProduct) => {
-      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: productKeys.detail(updatedProduct.id) });
-      callbacks.onSuccess?.();
-    },
-  });
-};
 export const useProductLeaderboard = (category) =>
   useQuery({
     queryKey: productKeys.leaderboard(category),

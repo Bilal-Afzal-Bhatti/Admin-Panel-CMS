@@ -239,69 +239,117 @@ export default function ProductsPage() {
       </Box>
 
       <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-        <Table>
-          <TableHead>
-           <TableRow sx={{ bgcolor: 'background.default' }}>
-  {['Product', 'Category', 'Price', 'Variants', 'Stock', 'Actions'].map((h) => (
-    <TableCell 
-      key={h} 
-      sx={{ 
-        fontWeight: 'bold',
-        // If it's the Actions column, nudge it right with padding
-        pl: h === 'Actions' ? 10 : 2, 
-        // Ensure the text itself stays left-aligned but shifted
-        textAlign: 'left' 
-      }}
-    >
-      {h}
-    </TableCell>
-  ))}
-</TableRow>
-          </TableHead>
-          <TableBody>
-            {products.map((row) => (
-              <TableRow key={row._id} hover>
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box component="img" src={row.image} sx={{ width: 44, height: 44, borderRadius: 1 }} />
-                    <Typography variant="body2" fontWeight={600}>{row.name}</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell><Chip label={row.category} size="small" variant="outlined" /></TableCell>
-                <TableCell><Typography variant="body2" fontWeight="bold">${row.price}</Typography></TableCell>
-                
-                {/* Variants Cell */}
-                <TableCell>
-                  <Tooltip title="Click to view stock details" arrow>
-                    <Box 
-                      onClick={() => setViewingProduct(row)} 
-                      sx={{ display: 'flex', gap: 0.5, cursor: 'pointer', alignItems: 'center' }}
-                    >
-                      {row.colors?.slice(0, 3).map((c, i) => (
-                        <Box key={i} sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: c.hex, border: '1px solid #ddd' }} />
-                      ))}
-                      {row.colors?.length > 3 && <Typography variant="caption">+{row.colors.length - 3}</Typography>}
-                    </Box>
-                  </Tooltip>
-                </TableCell>
+     
+<Table>
+  <TableHead>
+    <TableRow sx={{ bgcolor: 'rgba(255, 255, 255, 0.05)' }}>
+      {['Product', 'Category', 'Price', 'Rating', 'Variants', 'Stock', 'Actions'].map((h) => (
+        <TableCell 
+          key={h} 
+          // Center everything from Rating onwards for a balanced look
+          align={['Rating', 'Variants', 'Stock', 'Actions'].includes(h) ? 'center' : 'left'} 
+          sx={{ 
+            fontWeight: 'bold',
+            // Nudge Actions slightly if needed, but 'center' alignment usually handles it best
+            pl: h === 'Actions' ? 2 : 2, 
+          }}
+        >
+          {h}
+        </TableCell>
+      ))}
+    </TableRow>
+  </TableHead>
 
-                <TableCell><Chip label={row.stock} size="small" color={row.stock > 10 ? 'success' : 'error'} /></TableCell>
-                
-                <TableCell align="center">
-                  <Tooltip title="Quick View Variants" arrow>
-                    <IconButton color="info" onClick={() => setViewingProduct(row)}><PaletteIcon /></IconButton>
-                  </Tooltip>
-                  <Tooltip title="Edit Product" arrow>
-                    <IconButton color="primary" onClick={() => {setEditTarget(row); setForm({...row, price: String(row.price), stock: String(row.stock)});}}><EditIcon /></IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete Product" arrow>
-                    <IconButton color="error" onClick={() => deleteMutation.mutate(row._id)}><DeleteIcon /></IconButton>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+  <TableBody>
+    {products.map((row) => (
+      <TableRow key={row._id} hover>
+        <TableCell>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box component="img" src={row.image} sx={{ width: 44, height: 44, borderRadius: 1 }} />
+            <Typography variant="body2" fontWeight={600}>{row.name}</Typography>
+          </Box>
+        </TableCell>
+
+        <TableCell>
+          <Chip label={row.category} size="small" variant="outlined" />
+        </TableCell>
+
+        <TableCell>
+          <Typography variant="body2" fontWeight="bold">${row.price}</Typography>
+        </TableCell>
+
+        {/* ⭐️ RATINGS COLUMN RE-ADDED ⭐️ */}
+        <TableCell align="center">
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+            <Rating 
+              value={row.ratings?.average || 0} 
+              readOnly 
+              precision={0.5} 
+              size="small" 
+              sx={{ color: '#faaf00' }} 
+            />
+            <Typography variant="caption" color="text.secondary">
+              ({row.ratings?.count || 0})
+            </Typography>
+          </Box>
+        </TableCell>
+
+        <TableCell align="center">
+          <Tooltip title="View stock details" arrow>
+            <Box 
+              onClick={() => setViewingProduct(row)} 
+              sx={{ display: 'flex', gap: 0.5, cursor: 'pointer', justifyContent: 'center' }}
+            >
+              {row.colors?.slice(0, 3).map((c, i) => (
+                <Box key={i} sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: c.hex, border: '1px solid #ddd' }} />
+              ))}
+              {row.colors?.length > 3 && <Typography variant="caption">+{row.colors.length - 3}</Typography>}
+            </Box>
+          </Tooltip>
+        </TableCell>
+
+        <TableCell align="center">
+          <Chip 
+            label={row.stock} 
+            size="small" 
+            color={row.stock > 10 ? 'success' : 'error'} 
+          />
+        </TableCell>
+        
+        <TableCell align="center">
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+            <Tooltip title="Quick View Variants" arrow>
+              <IconButton color="info" size="small" onClick={() => setViewingProduct(row)}>
+                <PaletteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Edit Product" arrow>
+              <IconButton 
+                color="primary" 
+                size="small" 
+                onClick={() => {
+                  setEditTarget(row); 
+                  setForm({...row, price: String(row.price), stock: String(row.stock)});
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete Product" arrow>
+              <IconButton 
+                color="error" 
+                size="small" 
+                onClick={() => deleteMutation.mutate(row._id)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
       </TableContainer>
 
       {/* Dialogs */}
