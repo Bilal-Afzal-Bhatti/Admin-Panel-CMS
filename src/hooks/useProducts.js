@@ -1,5 +1,4 @@
 // src/hooks/useProducts.js
-
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import {
   productKeys,
@@ -8,13 +7,17 @@ import {
   addProduct,
   updateProduct,
   deleteProduct,
-  addProductColor,
-  removeProductColor,
+  addProductVariant,
+  updateProductVariantStock,
+  removeProductVariant,
   addProductReview,
   getProductLeaderboard,
 } from '../api/products';
 
 const LIMIT = 10;
+
+// ─── useProductList ───────────────────────────────────────────────────────────
+// src/hooks/useProducts.js — only the 3 broken hooks shown, rest unchanged
 
 // ─── useProductList ───────────────────────────────────────────────────────────
 export const useProductList = (page = 1) => {
@@ -26,9 +29,8 @@ export const useProductList = (page = 1) => {
     staleTime:       1000 * 60 * 2,
     placeholderData: (prev) => prev,
     select: (res) => ({
-      // axios interceptor returns response.data directly
-      // so res = { success, data, total, page, pages }
-      products:   res.data,
+      // res = { success, data: [...], total, page, pages }
+      products:   res.data,   // ✅ backend key is `data`
       total:      res.total,
       totalPages: res.pages,
       page:       res.page,
@@ -48,42 +50,7 @@ export const useProductList = (page = 1) => {
   return { ...query, prefetchNext };
 };
 
-// ─── useProduct ───────────────────────────────────────────────────────────────
-export const useProduct = (id) =>
-  useQuery({
-    queryKey: productKeys.detail(id),
-    queryFn:  () => getProductById(id),
-    enabled:  !!id,
-    staleTime: 1000 * 60 * 5,
-  });
-
-// ─── useCreateProduct ─────────────────────────────────────────────────────────
-export const useCreateProduct = (callbacks = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: addProduct,
-    onSuccess: (newProduct) => {
-      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
-      queryClient.setQueryData(productKeys.detail(newProduct._id), newProduct);
-      callbacks.onSuccess?.(newProduct);
-    },
-    onError: (error) => callbacks.onError?.(error),
-  });
-};
-
-
-export const useProductLeaderboard = (category) =>
-  useQuery({
-    queryKey: productKeys.leaderboard(category),
-    queryFn: () => getProductLeaderboard(category),
-    enabled: !!category,
-    staleTime: 1000 * 60 * 5, // Analytics data stays fresh for 5 mins
-    select: (res) => res.data, // Extract the leaderboard array
-  });
-
-// ─── useAddProductColor ───────────────────────────────────────────────────────
-// ─── useUpdateProduct (Optimized for Variants) ───────────────────────────────
+// ─── useUpdateProduct ─────────────────────────────────────────────────────────
 export const useUpdateProduct = (callbacks = {}) => {
   const queryClient = useQueryClient();
 
@@ -94,23 +61,22 @@ export const useUpdateProduct = (callbacks = {}) => {
       await queryClient.cancelQueries({ queryKey: productKeys.lists() });
       await queryClient.cancelQueries({ queryKey: productKeys.detail(updatedProduct.id) });
 
-      const previousLists = queryClient.getQueriesData({ queryKey: productKeys.lists() });
+      const previousLists  = queryClient.getQueriesData({ queryKey: productKeys.lists() });
       const previousDetail = queryClient.getQueryData(productKeys.detail(updatedProduct.id));
 
-      // Optimistic update for all list pages
+      // ✅ raw cache shape is { success, data: [...], total, page, pages }
       queryClient.setQueriesData({ queryKey: productKeys.lists() }, (old) => {
-        if (!old) return old;
+        if (!old?.data) return old;
         return {
           ...old,
-          // 🚩 Improvement: Use deep merge or ensure colors are preserved
-          products: old.products.map((p) =>
+          data: old.data.map((p) =>
             p._id === updatedProduct.id ? { ...p, ...updatedProduct } : p
           ),
         };
       });
 
       queryClient.setQueryData(productKeys.detail(updatedProduct.id), (old) =>
-        old ? { ...old, ...updatedProduct } : old
+        old ? { ...old, data: { ...old.data, ...updatedProduct } } : old
       );
 
       return { previousLists, previousDetail };
@@ -125,7 +91,6 @@ export const useUpdateProduct = (callbacks = {}) => {
     },
 
     onSettled: (_, __, updatedProduct) => {
-      // 🚩 Refresh everything to ensure Stock/Color totals match DB exactly
       queryClient.invalidateQueries({ queryKey: productKeys.lists() });
       queryClient.invalidateQueries({ queryKey: productKeys.detail(updatedProduct.id) });
       callbacks.onSuccess?.();
@@ -133,65 +98,6 @@ export const useUpdateProduct = (callbacks = {}) => {
   });
 };
 
-// ─── useAddProductColor (Instant UI Update) ──────────────────────────────────
-export const useAddProductColor = (callbacks = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: addProductColor,
-    onSuccess: (updatedProduct) => {
-      // 🚩 Directly update the cache instead of just invalidating
-      // This makes the "Quick-View" modal update INSTANTLY
-      queryClient.setQueryData(productKeys.detail(updatedProduct._id), updatedProduct);
-      
-      // Update the product in the list too
-      queryClient.setQueriesData({ queryKey: productKeys.lists() }, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          products: old.products.map((p) => 
-            p._id === updatedProduct._id ? updatedProduct : p
-          ),
-        };
-      });
-      
-      callbacks.onSuccess?.(updatedProduct);
-    },
-    onError: (error) => callbacks.onError?.(error),
-  });
-};
-
-// ─── useRemoveProductColor ────────────────────────────────────────────────────
-export const useRemoveProductColor = (callbacks = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: removeProductColor,
-    onSuccess: (updatedProduct, variables) => {
-      queryClient.invalidateQueries({ queryKey: productKeys.detail(variables.productId) });
-      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
-      callbacks.onSuccess?.(updatedProduct);
-    },
-    onError: (error) => callbacks.onError?.(error),
-  });
-};
-
-// ─── useAddReview ─────────────────────────────────────────────────────────────
-export const useAddReview = (callbacks = {}) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: addProductReview,
-    onSuccess: (_, variables) => {
-      // Refresh the product details to show new average rating
-      queryClient.invalidateQueries({ queryKey: productKeys.detail(variables.productId) });
-      // Crucial: Invalidate leaderboard since rankings might change!
-      queryClient.invalidateQueries({ queryKey: ['products', 'leaderboard'] });
-      callbacks.onSuccess?.();
-    },
-    onError: (error) => callbacks.onError?.(error),
-  });
-};
 // ─── useDeleteProduct ─────────────────────────────────────────────────────────
 export const useDeleteProduct = (callbacks = {}) => {
   const queryClient = useQueryClient();
@@ -203,8 +109,9 @@ export const useDeleteProduct = (callbacks = {}) => {
       await queryClient.cancelQueries({ queryKey: productKeys.lists() });
       const previousLists = queryClient.getQueriesData({ queryKey: productKeys.lists() });
 
+      // ✅ raw cache shape uses `data` not `products` — select runs AFTER
       queryClient.setQueriesData({ queryKey: productKeys.lists() }, (old) => {
-        if (!old) return old;
+        if (!old?.data) return old;
         return { ...old, data: old.data.filter((p) => p._id !== id) };
       });
 
@@ -224,3 +131,136 @@ export const useDeleteProduct = (callbacks = {}) => {
     },
   });
 };
+
+// ─── useProduct ───────────────────────────────────────────────────────────────
+export const useProduct = (id) =>
+  useQuery({
+    queryKey:  productKeys.detail(id),
+    queryFn:   () => getProductById(id),
+    enabled:   !!id,
+    staleTime: 1000 * 60 * 5,
+  });
+
+// ─── useProductLeaderboard ────────────────────────────────────────────────────
+export const useProductLeaderboard = (category) =>
+  useQuery({
+    queryKey:  productKeys.leaderboard(category),
+    queryFn:   () => getProductLeaderboard(category),
+    enabled:   !!category,
+    staleTime: 1000 * 60 * 5,
+    select:    (res) => res.data,
+  });
+
+// ─── useCreateProduct ─────────────────────────────────────────────────────────
+export const useCreateProduct = (callbacks = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: addProduct,
+    onSuccess: (newProduct) => {
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      queryClient.setQueryData(productKeys.detail(newProduct._id), newProduct);
+      callbacks.onSuccess?.(newProduct);
+    },
+    onError: (error) => callbacks.onError?.(error),
+  });
+};
+
+// ─── useUpdateProduct ─────────────────────────────────────────────────────────
+
+// ─── useAddProductVariant ─────────────────────────────────────────────────────
+export const useAddProductVariant = (callbacks = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: addProductVariant,
+    onSuccess: (updatedProduct) => {
+      // Directly update cache so modals reflect new variant instantly
+      queryClient.setQueryData(productKeys.detail(updatedProduct.data._id), updatedProduct.data);
+
+      queryClient.setQueriesData({ queryKey: productKeys.lists() }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          products: old.products.map((p) =>
+            p._id === updatedProduct.data._id ? updatedProduct.data : p
+          ),
+        };
+      });
+
+      callbacks.onSuccess?.(updatedProduct.data);
+    },
+    onError: (error) => callbacks.onError?.(error),
+  });
+};
+
+// ─── useUpdateProductVariantStock ─────────────────────────────────────────────
+export const useUpdateProductVariantStock = (callbacks = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateProductVariantStock, // { productId, variantId, stock }
+
+    onMutate: async ({ productId, variantId, stock }) => {
+      await queryClient.cancelQueries({ queryKey: productKeys.detail(productId) });
+      const previousDetail = queryClient.getQueryData(productKeys.detail(productId));
+
+      // Optimistically update the single variant's stock + recalculate total
+      queryClient.setQueryData(productKeys.detail(productId), (old) => {
+        if (!old) return old;
+        const updatedVariants = old.data.variants.map((v) =>
+          v._id === variantId ? { ...v, stock } : v
+        );
+        const newTotalStock = updatedVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        return { ...old, data: { ...old.data, variants: updatedVariants, stock: newTotalStock } };
+      });
+
+      return { previousDetail };
+    },
+
+    onError: (error, { productId }, context) => {
+      queryClient.setQueryData(productKeys.detail(productId), context?.previousDetail);
+      callbacks.onError?.(error);
+    },
+
+    onSettled: (_, __, { productId }) => {
+      // Always re-sync from DB — stock is calculated server-side
+      queryClient.invalidateQueries({ queryKey: productKeys.detail(productId) });
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      callbacks.onSuccess?.();
+    },
+  });
+};
+
+// ─── useRemoveProductVariant ──────────────────────────────────────────────────
+export const useRemoveProductVariant = (callbacks = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: removeProductVariant,
+    onSuccess: (updatedProduct, variables) => {
+      queryClient.invalidateQueries({ queryKey: productKeys.detail(variables.productId) });
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      callbacks.onSuccess?.(updatedProduct);
+    },
+    onError: (error) => callbacks.onError?.(error),
+  });
+};
+
+// ─── useAddReview ─────────────────────────────────────────────────────────────
+export const useAddReview = (callbacks = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: addProductReview,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: productKeys.detail(variables.productId) });
+      // Leaderboard rankings may shift after a new review
+      queryClient.invalidateQueries({ queryKey: ['products', 'leaderboard'] });
+      callbacks.onSuccess?.();
+    },
+    onError: (error) => callbacks.onError?.(error),
+  });
+};
+
+// ─── useDeleteProduct ─────────────────────────────────────────────────────────

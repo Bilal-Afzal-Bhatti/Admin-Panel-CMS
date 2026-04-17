@@ -1,19 +1,18 @@
 // src/api/products.js
 import axiosInstance from './axiosInstance';
 
-// ─── Query Key Factory ────────────────────────────────────────────────────────
 export const productKeys = {
-  all:     ()            => ['products'],
-  lists:   ()            => [...productKeys.all(), 'list'],
-  list:    (page, limit) => [...productKeys.lists(), { page, limit }],
-  detail:  (id)          => [...productKeys.all(), 'detail', id],
-  // 🌟 Added for Industry Standard 4
-  leaderboard: (category) => [...productKeys.all(), 'leaderboard', category],
+  all:         ()            => ['products'],
+  lists:       ()            => [...productKeys.all(), 'list'],
+  list:        (page, limit) => [...productKeys.lists(), { page, limit }],
+  detail:      (id)          => [...productKeys.all(), 'detail', id],
+  leaderboard: (category)    => [...productKeys.all(), 'leaderboard', category],
 };
 
-// ─── Existing API Functions ───────────────────────────────────────────────────
+// ─── Products ─────────────────────────────────────────────────────────────────
 export const getProducts = async ({ page = 1, limit = 10 } = {}) => {
-  return axiosInstance.get('/products', { params: { page, limit } });
+  const res = await axiosInstance.get('/products', { params: { page, limit } });
+  return res.data; // { success, data, total, page, pages }
 };
 
 export const getProductById = async (id) => {
@@ -36,27 +35,29 @@ export const deleteProduct = async (id) => {
   return id;
 };
 
-// ─── New Color Variant Functions ─────────────────────────────────────────────
-export const addProductColor = async ({ productId, colorData }) => {
-  // colorData expects: { name, hex, stock }
-  const res = await axiosInstance.post(`/products/${productId}/colors`, colorData);
+// ─── Variants ─────────────────────────────────────────────────────────────────
+export const addProductVariant = async ({ productId, variantData }) => {
+  const res = await axiosInstance.post(`/products/${productId}/variants`, variantData);
   return res.data;
 };
 
-export const removeProductColor = async ({ productId, colorId }) => {
-  const res = await axiosInstance.delete(`/products/${productId}/colors/${colorId}`);
+export const updateProductVariantStock = async ({ productId, variantId, stock }) => {
+  const res = await axiosInstance.patch(`/products/${productId}/variants/${variantId}`, { stock });
   return res.data;
 };
 
-// ─── New Ratings & Analytics Functions ───────────────────────────────────────
+export const removeProductVariant = async ({ productId, variantId }) => {
+  const res = await axiosInstance.delete(`/products/${productId}/variants/${variantId}`);
+  return res.data;
+};
+
+// ─── Ratings & Analytics ──────────────────────────────────────────────────────
 export const addProductReview = async ({ productId, rating }) => {
-  // Expects { rating: 1-5 }
-  const res = await axiosInstance.post(`/products/${productId}/reviews`, { rating });
+  const res = await axiosInstance.post(`/products/${productId}/review`, { rating });
   return res.data;
 };
 
 export const getProductLeaderboard = async (category) => {
-  const res = await axiosInstance.get(`/leaderboard/${category}`);
-  return res.data; 
-  // returns { success, data: [...] } where data is your top 10 list
+  const res = await axiosInstance.get(`/products/leaderboard/${category}`);
+  return res.data;
 };
