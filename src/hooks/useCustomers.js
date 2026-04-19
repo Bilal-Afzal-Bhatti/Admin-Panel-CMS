@@ -20,16 +20,22 @@ export const useCustomerList = ({ page = 1, authMethod = '', search = '' } = {})
     queryFn:         () => getCustomers(filters),
     staleTime:       1000 * 60 * 2,
     placeholderData: (prev) => prev,
-    select: (res) => ({
-      // axios interceptor returns response.data directly
-      // so res = { success, summary, data, page, pages }
-      customers:  res.data,
-      summary:    res.summary,
-      total:      res.summary.total,
-      totalPages: res.pages,
-      page:       res.page,
-    }),
-  });
+   select: (res) => {
+  // 'res' is the Axios object
+  // 'payload' is the object containing { success: true, summary: {...}, data: [...] }
+  const payload = res?.data; 
+
+  return {
+    // ❌ OLD: customers: payload.data (which was looking for payload.data.data)
+    // ✅ NEW: Targeting exactly what we see in your DevTools screenshot
+    customers:  payload?.data ?? [],    // The array inside your payload
+    summary:    payload?.summary ?? {}, // The summary object
+    total:      payload?.summary?.total ?? 0,
+    totalPages: payload?.pages ?? 1,
+    page:       payload?.page ?? 1,
+  };
+}
+    });
 
   const prefetchNext = () => {
     if (page < (query.data?.totalPages ?? 1)) {

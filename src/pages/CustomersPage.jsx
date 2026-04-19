@@ -63,7 +63,9 @@ function CustomerDetailDialog({ customer, onClose }) {
             ['ID',       customer._id],
             ['Verified', customer.isVerified ? 'Yes' : 'No'],
             ['Wishlist', `${customer.wishlist?.length ?? 0} items`],
-            ['Joined',   new Date(customer.createdAt).toLocaleDateString()],
+            
+          ['Joined', customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : 'N/A']
+            
           ].map(([label, value]) => (
             <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography variant="body2" color="text.secondary">{label}</Typography>
