@@ -37,7 +37,7 @@ const SIZE_OPTIONS = [
 ];
 
 const CATEGORIES = [
-  'Electronics', 'Clothing', 'Footwear', 'Accessories', 'Home & Kitchen',
+ 'Flash Sales', 'New Arrival','Our Products', 'Electronics', 'Clothing', 'Footwear', 'Accessories', 'Home & Kitchen',
   'Beauty & Health', 'Sports & Outdoors', 'Toys & Games', 'Books', 'Other',
 ];
 
