@@ -1,30 +1,74 @@
-// Base URL dynamically loaded from .env
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5731/api/admin'; 
+// src/api/admin.js
+import axiosInstance from './axiosInstance';
 
-// Utility to grab admin token perfectly
-const getHeaders = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('adminToken') || 'dev-token'}`,
-});
-
-export const getCancellations = async () => {
-  const res = await fetch(`${API_URL}/cancellations`, { headers: getHeaders() });
-  
-  if (!res.ok) throw new Error('Failed to fetch cancellations');
-  return res.json();
+// ─── Products ─────────────────────────────────────────────────────────────────
+export const getProducts = async ({ page = 1, limit = 10, category, search } = {}) => {
+  const res = await axiosInstance.get('/products', {
+    params: { page, limit, category, search }
+  });
+  return res.data;
 };
 
-export const processCancellation = async ({ cancellationId, action }) => {
-  const res = await fetch(`${API_URL}/cancellations/${cancellationId}/process`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ action })
+// ─── Orders ───────────────────────────────────────────────────────────────────
+export const getOrders = async ({ page = 1, limit = 10, search = '', status = '' } = {}) => {
+  const res = await axiosInstance.get('/orders', {
+    params: { page, limit, search, status }
   });
-  
-  if (!res.ok) {
-     const error = await res.json();
-     throw new Error(error.message || 'Failed to process cancellation');
-  }
-  
-  return res.json();
+  return res.data;
+};
+
+export const updateOrderStatus = async ({ orderId, status }) => {
+  const res = await axiosInstance.patch(`/orders/${orderId}/status`, { status });
+  return res.data;
+};
+
+// ─── Cancellations ────────────────────────────────────────────────────────────
+export const getCancellations = async () => {
+  const res = await axiosInstance.get('/orders/cancellations');
+  return res.data.data;
+};
+
+export const processCancellation = async ({ cancellationId, action, adminComment }) => {
+  const res = await axiosInstance.patch(`/orders/cancellations/${cancellationId}`, {
+    action,
+    adminComment,
+  });
+  return res.data;
+};
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+export const getCustomers = async () => {
+  const res = await axiosInstance.get('/customers');
+  return res.data;
+};
+
+export const getCustomerById = async (id) => {
+  const res = await axiosInstance.get(`/customers/${id}`);
+  return res.data;
+};
+
+export const deleteCustomer = async (id) => {
+  const res = await axiosInstance.delete(`/customers/${id}`);
+  return res.data;
+};
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+export const getProfile = async () => {
+  const res = await axiosInstance.get('/settings/profile');
+  return res.data;
+};
+
+export const updateProfile = async (data) => {
+  const res = await axiosInstance.put('/settings/profile', data);
+  return res.data;
+};
+
+export const getStoreSettings = async () => {
+  const res = await axiosInstance.get('/settings/store');
+  return res.data;
+};
+
+export const updateStoreSettings = async (data) => {
+  const res = await axiosInstance.put('/settings/store', data);
+  return res.data;
 };
