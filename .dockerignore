@@ -1,0 +1,8 @@
+cat > /mnt/c/Users/user/OneDrive/Desktop/PROJECTS/admin-cms/.dockerignore << 'EOF'
+node_modules
+.env
+.env.local
+dist
+.git
+*.log
+EOF
