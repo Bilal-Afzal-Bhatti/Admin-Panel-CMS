@@ -2,12 +2,13 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-  baseURL: 'https://shoppingstore-backend.vercel.app' || 'http://localhost:5000/api/admin',
+  baseURL: import.meta.env.VITE_API_URL ,
  
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 });
-console.log("Axios Instance Base URL:", axiosInstance.defaults.baseURL);
+console.log('API URL:', import.meta.env.VITE_API_URL || 'http://localhost:5000/api/admin');
+
 // ─── Request Interceptor ──────────────────────────────────────────────────────
 axiosInstance.interceptors.request.use(
   (config) => {
