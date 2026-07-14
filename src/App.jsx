@@ -34,10 +34,10 @@ function App() {
             {/* Protected */}
             <Route path="/" element={<AuthGuard><MainLayout /></AuthGuard>}>
               <Route index          element={<DashboardPage />} />
-              <Route path="products"  element={<ProductsPage />} />
-              <Route path="orders"    element={<OrdersPage />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="settings"  element={<SettingsPage />} />
+              <Route path="/products"  element={<ProductsPage />} />
+              <Route path="/orders"    element={<OrdersPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/settings"  element={<SettingsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
