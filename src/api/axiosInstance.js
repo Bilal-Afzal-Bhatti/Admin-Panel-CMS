@@ -7,8 +7,7 @@ const axiosInstance = axios.create({
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 });
-console.log('API URL:', import.meta.env.VITE_API_URL || 'http://localhost:5000/api/admin');
-
+console.log("Axios Instance Base URL:", axiosInstance.defaults.baseURL);
 // ─── Request Interceptor ──────────────────────────────────────────────────────
 axiosInstance.interceptors.request.use(
   (config) => {
