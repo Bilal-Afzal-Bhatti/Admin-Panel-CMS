@@ -9,6 +9,7 @@ export const adminRegister = async (userData) => {
     body: JSON.stringify(userData)
   });
   const data = await res.json();
+  console.log('Register Response:', data); // Log the response for debugging
   if (!res.ok) throw new Error(data.message || 'Failed to register admin');
   return data;
 };
