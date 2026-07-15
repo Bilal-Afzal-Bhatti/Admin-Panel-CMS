@@ -43,6 +43,7 @@ function App() {
         </BrowserRouter>
       </ThemeModeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
+      
     </QueryClientProvider>
   );
 }
