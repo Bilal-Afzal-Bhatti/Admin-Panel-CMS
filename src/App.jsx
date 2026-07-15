@@ -11,7 +11,7 @@ import GenericPage     from './pages/GenericPage';
 import SignUpPage      from './pages/SignUpPage';
 import LoginPage       from './pages/LoginPage';
 import CustomersPage   from './pages/CustomersPage';
-import SettingsPage    from './pages/SettingsPage';
+import SettingsPage from './pages/SettingsPage';
 
 const queryClient = new QueryClient();
 
