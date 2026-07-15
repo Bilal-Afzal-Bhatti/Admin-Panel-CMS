@@ -11,7 +11,7 @@ import GenericPage     from './pages/GenericPage';
 import SignUpPage      from './pages/SignUpPage';
 import LoginPage       from './pages/LoginPage';
 import CustomersPage   from './pages/CustomersPage';
-import SettingsPage    from './pages/SettingsPage';
+
 
 const queryClient = new QueryClient();
 
@@ -37,7 +37,7 @@ function App() {
               <Route path="/products"  element={<ProductsPage />} />
               <Route path="/orders"    element={<OrdersPage />} />
               <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/settings"  element={<SettingsPage/>} />
+           
             </Route>
           </Routes>
         </BrowserRouter>
