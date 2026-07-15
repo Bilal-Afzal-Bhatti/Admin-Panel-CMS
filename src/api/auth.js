@@ -1,5 +1,5 @@
 // auth.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5731/api/admin';
+const API_URL = 'https://shoppingstore-backend.vercel.app/api/admin' || 'http://localhost:5731/api/admin';
 
 export const adminRegister = async (userData) => {
   // Remove the redundant /api/admin from the string
