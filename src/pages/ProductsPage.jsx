@@ -73,22 +73,40 @@ function ProductForm({ form, setForm, errors, setErrors }) {
       setNewVariant((prev) => ({ ...prev, color: { name: selected.name, hex: selected.hex } }));
   };
 
+  // ✅ UPDATED: Supports updating existing variants & preserves subdocument _id
   const addVariantToForm = () => {
     if (!newVariant.color.name || !newVariant.size) return;
-    const isDuplicate = form.variants.some(
-      (v) =>
-        v.color.name.toLowerCase() === newVariant.color.name.toLowerCase() &&
-        v.size.toLowerCase()       === newVariant.size.toLowerCase()
-    );
-    if (isDuplicate) return;
 
-    setForm((prev) => ({
-      ...prev,
-      variants: [
-        ...prev.variants,
-        { ...newVariant, stock: Math.max(0, Number(newVariant.stock) || 0) },
-      ],
-    }));
+    const newStockVal = Math.max(0, Number(newVariant.stock) || 0);
+
+    setForm((prev) => {
+      const existingIndex = prev.variants.findIndex(
+        (v) =>
+          v.color.name.toLowerCase() === newVariant.color.name.toLowerCase() &&
+          v.size.toLowerCase() === newVariant.size.toLowerCase()
+      );
+
+      if (existingIndex > -1) {
+        // Variant exists: Update stock & keep existing _id!
+        const updatedVariants = [...prev.variants];
+        updatedVariants[existingIndex] = {
+          ...updatedVariants[existingIndex],
+          stock: newStockVal,
+        };
+        return { ...prev, variants: updatedVariants };
+      }
+
+      // New variant: Append to list
+      return {
+        ...prev,
+        variants: [
+          ...prev.variants,
+          { ...newVariant, stock: newStockVal },
+        ],
+      };
+    });
+
+    // Reset input fields
     setNewVariant({ color: { name: '', hex: '#000000' }, size: '', stock: 0 });
   };
 
@@ -133,16 +151,15 @@ function ProductForm({ form, setForm, errors, setErrors }) {
           error={!!errors.price} helperText={errors.price}
         />
 
-        {/* ── Discount — editable, placeholder shows default ── */}
+        {/* Discount */}
         <TextField
           label="Discount"
           fullWidth
           value={form.discount}
           onChange={handle('discount')}
-          placeholder="No Discount"   // shown when empty — admin can type e.g. "10% OFF"
+          placeholder="No Discount"
           InputProps={{
             endAdornment: form.discount ? (
-              // ✕ clear button — resets to empty (backend default kicks in)
               <InputAdornment position="end">
                 <IconButton size="small" onClick={() => setForm((p) => ({ ...p, discount: '' }))}>
                   ✕
@@ -156,7 +173,7 @@ function ProductForm({ form, setForm, errors, setErrors }) {
 
       {/* Variant Builder */}
       <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
-        ADD VARIANTS
+        ADD / UPDATE VARIANTS
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -199,7 +216,7 @@ function ProductForm({ form, setForm, errors, setErrors }) {
           disabled={!newVariant.color.name || !newVariant.size}
           sx={{ height: 40, px: 2 }}
         >
-          Add
+          Add / Update
         </Button>
       </Box>
 
@@ -208,7 +225,7 @@ function ProductForm({ form, setForm, errors, setErrors }) {
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {form.variants.map((v, i) => (
             <Chip
-              key={i}
+              key={v._id || i}
               avatar={<Avatar sx={{ bgcolor: v.color.hex, width: 22, height: 22 }}> </Avatar>}
               label={`${v.color.name} / ${v.size} — ${v.stock}`}
               onDelete={() => removeVariantFromForm(i)}
@@ -219,7 +236,7 @@ function ProductForm({ form, setForm, errors, setErrors }) {
         </Box>
       )}
 
-      {/* Total Stock — read-only live counter */}
+      {/* Total Stock */}
       <Box
         sx={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -324,10 +341,6 @@ export default function ProductsPage() {
   const [toast, setToast]                   = useState({ open: false, message: '', severity: 'success' });
 
   const { data, isLoading } = useProductList(page);
-
-  // ✅ Backend shape: { success, data: [...], total, page, pages }
-  // getProducts returns res.data = that object
-  // useProductList select maps: res.data → products, res.pages → totalPages
   const products = data?.products ?? [];
 
   const showToast = useCallback(
@@ -359,11 +372,9 @@ export default function ProductsPage() {
       price:         parseFloat(form.price),
       originalPrice: form.originalPrice || null,
       image:         form.image,
-      // ✅ empty string → backend default "No Discount"
       discount:      form.discount?.trim() || 'No Discount',
       category:      form.category,
       variants:      form.variants,
-      // stock intentionally omitted — backend calculates from variants
     };
 
     if (isEdit) updateMutation.mutate({ id: editTarget._id, ...payload });
@@ -463,9 +474,9 @@ export default function ProductsPage() {
                       }}
                     >
                       {row.variants?.slice(0, 3).map((v, i) => (
-                        <Box key={i} sx={{
+                        <Box key={v._id || i} sx={{
                           width: 14, height: 14, borderRadius: '50%',
-                          bgcolor: v.color.hex, border: '1px solid #ddd',
+                          bgcolor: v.color?.hex, border: '1px solid #ddd',
                         }} />
                       ))}
                       {row.variants?.length > 3 && (
@@ -504,13 +515,17 @@ export default function ProductsPage() {
                             name:          row.name,
                             price:         String(row.price),
                             image:         row.image,
-                            // ✅ "No Discount" → empty string so placeholder shows
                             discount:      row.discount === 'No Discount' ? '' : (row.discount || ''),
                             category:      row.category,
                             originalPrice: row.originalPrice || '',
-                            // ✅ deep-clone variants so form edits don't mutate cache
+                            // ✅ Deep clone variants while preserving _id
                             variants:      row.variants
-                              ? row.variants.map((v) => ({ ...v, color: { ...v.color } }))
+                              ? row.variants.map((v) => ({
+                                  _id: v._id,
+                                  color: { ...v.color },
+                                  size: v.size,
+                                  stock: v.stock,
+                                }))
                               : [],
                           });
                         }}
