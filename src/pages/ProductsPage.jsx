@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import Papa from 'papaparse';
 import {
   Box, Typography, Button, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
@@ -10,6 +11,7 @@ import AddIcon         from '@mui/icons-material/Add';
 import DeleteIcon      from '@mui/icons-material/DeleteOutlined';
 import EditIcon        from '@mui/icons-material/EditOutlined';
 import PaletteIcon     from '@mui/icons-material/Palette';
+import FileUploadIcon  from '@mui/icons-material/FileUpload';
 import {
   useProductList,
   useCreateProduct,
@@ -54,7 +56,7 @@ const validate = (form) => {
   return errs;
 };
 
-// ─── ProductForm ──────────────────────────────────────────────────────────────
+// ─── ProductForm (UNTOUCHED) ──────────────────────────────────────────────────
 function ProductForm({ form, setForm, errors, setErrors }) {
   const [newVariant, setNewVariant] = useState({
     color: { name: '', hex: '#000000' }, size: '', stock: 0,
@@ -73,7 +75,6 @@ function ProductForm({ form, setForm, errors, setErrors }) {
       setNewVariant((prev) => ({ ...prev, color: { name: selected.name, hex: selected.hex } }));
   };
 
-  // ✅ UPDATED: Supports updating existing variants & preserves subdocument _id
   const addVariantToForm = () => {
     if (!newVariant.color.name || !newVariant.size) return;
 
@@ -87,7 +88,6 @@ function ProductForm({ form, setForm, errors, setErrors }) {
       );
 
       if (existingIndex > -1) {
-        // Variant exists: Update stock & keep existing _id!
         const updatedVariants = [...prev.variants];
         updatedVariants[existingIndex] = {
           ...updatedVariants[existingIndex],
@@ -96,7 +96,6 @@ function ProductForm({ form, setForm, errors, setErrors }) {
         return { ...prev, variants: updatedVariants };
       }
 
-      // New variant: Append to list
       return {
         ...prev,
         variants: [
@@ -106,7 +105,6 @@ function ProductForm({ form, setForm, errors, setErrors }) {
       };
     });
 
-    // Reset input fields
     setNewVariant({ color: { name: '', hex: '#000000' }, size: '', stock: 0 });
   };
 
@@ -261,7 +259,7 @@ function ProductForm({ form, setForm, errors, setErrors }) {
   );
 }
 
-// ─── ProductDialog ─────────────────────────────────────────────────────────
+// ─── ProductDialog (UNTOUCHED) ───────────────────────────────────────────────
 function ProductDialog({
   open, title, form, setForm, errors, setErrors, isPending, onClose, onSave,
 }) {
@@ -281,7 +279,7 @@ function ProductDialog({
   );
 }
 
-// ─── VariantViewer ─────────────────────────────────────────────────────────
+// ─── VariantViewer (UNTOUCHED) ───────────────────────────────────────────────
 function VariantViewer({ product, onClose }) {
   if (!product) return null;
   const variants = product.variants || [];
@@ -340,6 +338,8 @@ export default function ProductsPage() {
   const [errors, setErrors]                 = useState({});
   const [toast, setToast]                   = useState({ open: false, message: '', severity: 'success' });
 
+  const fileInputRef = useRef(null);
+
   const { data, isLoading } = useProductList(page);
   const products = data?.products ?? [];
 
@@ -381,6 +381,65 @@ export default function ProductsPage() {
     else        createMutation.mutate(payload);
   };
 
+  // ─── CSV Import Handler ───────────────────────────────────────────────────
+  const handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        let importedCount = 0;
+        let updatedCount = 0;
+
+        results.data.forEach((row) => {
+          const csvName = (row.name || row.Product || row.title || '').trim();
+          if (!csvName) return;
+
+          const csvPrice = parseFloat(row.price || row.Price || 0);
+          const csvImage = row.image || row.Image || row.imageUrl || 'https://via.placeholder.com/150';
+          const csvCategory = row.category || row.Category || 'Other';
+          const csvDiscount = row.discount || row.Discount || 'No Discount';
+
+          let parsedVariants = [];
+          if (row.variants) {
+            try {
+              parsedVariants = JSON.parse(row.variants);
+            } catch (err) {
+              parsedVariants = [];
+            }
+          }
+
+          const existingMatch = products.find(
+            (p) => p.name.toLowerCase() === csvName.toLowerCase()
+          );
+
+          const payload = {
+            name: csvName,
+            price: csvPrice,
+            image: csvImage,
+            category: csvCategory,
+            discount: csvDiscount,
+            variants: parsedVariants,
+          };
+
+          if (existingMatch) {
+            updateMutation.mutate({ id: existingMatch._id, ...payload });
+            updatedCount++;
+          } else {
+            createMutation.mutate(payload);
+            importedCount++;
+          }
+        });
+
+        showToast(`CSV Processed: ${importedCount} created, ${updatedCount} updated.`);
+        e.target.value = ''; // Reset input
+      },
+      error: (err) => showToast(`Error parsing CSV: ${err.message}`, 'error'),
+    });
+  };
+
   if (isLoading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
       <CircularProgress />
@@ -389,15 +448,35 @@ export default function ProductsPage() {
 
   return (
     <Box>
-      {/* Header */}
+      {/* Hidden File Input for CSV */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleCSVUpload}
+      />
+
+      {/* Header with Add Product & Import CSV buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h4" fontWeight="bold">Products</Typography>
-        <Button
-          variant="contained" startIcon={<AddIcon />}
-          onClick={() => { setForm(EMPTY_FORM); setAddOpen(true); }}
-        >
-          Add Product
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<FileUploadIcon />}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import CSV
+          </Button>
+
+          <Button
+            variant="contained" startIcon={<AddIcon />}
+            onClick={() => { setForm(EMPTY_FORM); setAddOpen(true); }}
+          >
+            Add Product
+          </Button>
+        </Box>
       </Box>
 
       {/* Table */}
@@ -518,7 +597,6 @@ export default function ProductsPage() {
                             discount:      row.discount === 'No Discount' ? '' : (row.discount || ''),
                             category:      row.category,
                             originalPrice: row.originalPrice || '',
-                            // ✅ Deep clone variants while preserving _id
                             variants:      row.variants
                               ? row.variants.map((v) => ({
                                   _id: v._id,
